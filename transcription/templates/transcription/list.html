@@ -1,0 +1,195 @@
+{% extends "transcription/base.html" %}
+{% block title %}Uploaded Interviews{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto mt-10 p-6 bg-white rounded shadow">
+    <h2 class="text-2xl font-bold mb-6">Transcriptions</h2>
+
+    <form method="get" class="mb-4 flex flex-wrap gap-3 items-end">
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Search</label>
+            <input
+                type="text"
+                name="q"
+                value="{{ q }}"
+                placeholder="Search file name..."
+                class="border rounded px-3 py-2 w-64"
+            >
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Status</label>
+            <select name="status" class="border rounded px-3 py-2">
+                <option value="all" {% if status_filter == "all" %}selected{% endif %}>All</option>
+                <option value="UPLOADED" {% if status_filter == "UPLOADED" %}selected{% endif %}>UPLOADED</option>
+                <option value="PROCESSING" {% if status_filter == "PROCESSING" %}selected{% endif %}>PROCESSING</option>
+                <option value="DONE" {% if status_filter == "DONE" %}selected{% endif %}>DONE</option>
+                <option value="ERROR" {% if status_filter == "ERROR" %}selected{% endif %}>ERROR</option>
+                <option value="CANCELLED" {% if status_filter == "CANCELLED" %}selected{% endif %}>CANCELLED</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Sort</label>
+            <select name="sort" class="border rounded px-3 py-2">
+                <option value="newest" {% if sort == "newest" %}selected{% endif %}>Newest</option>
+                <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest</option>
+                <option value="status" {% if sort == "status" %}selected{% endif %}>Status</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Page Size</label>
+            <select name="page_size" class="border rounded px-3 py-2">
+                <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
+                <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+            </select>
+        </div>
+        <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" type="submit" title="Apply filters and sorting">
+            Filter
+        </button>
+        <a class="text-sm text-blue-600 hover:underline" href="{% url 'transcription:list_transcriptions' %}" title="Reset filters and sorting">
+            Reset
+        </a>
+    </form>
+
+    <form method="POST" action="{% url 'transcription:delete_transcriptions_bulk' %}">
+        {% csrf_token %}
+        <div class="mb-4 flex items-center gap-2">
+            <button
+                type="submit"
+                class="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded"
+                onclick="return confirm('Delete selected transcriptions and audio files?');"
+            >
+                Delete Selected
+            </button>
+            <button
+                id="selectAllBtn"
+                type="button"
+                class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded"
+            >
+                Select All
+            </button>
+            <button
+                id="selectNoneBtn"
+                type="button"
+                class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded"
+            >
+                Select None
+            </button>
+        </div>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full border border-gray-200">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="py-2 px-4 border-b text-center">
+                        <input id="selectAll" type="checkbox">
+                    </th>
+                    <th class="py-2 px-4 border-b text-left">File Name</th>
+                    <th class="py-2 px-4 border-b text-left">Status</th>
+                    <th class="py-2 px-4 border-b text-left">Uploaded At</th>
+                    <th class="py-2 px-4 border-b text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for transcription in transcriptions %}
+                <tr class="hover:bg-gray-50">
+                    <td class="py-2 px-4 border-b text-center">
+                        <input type="checkbox" name="selected_ids" value="{{ transcription.id }}" class="row-checkbox">
+                    </td>
+                    <!-- File Name with truncation for long names -->
+                    <td class="py-2 px-4 border-b max-w-xs truncate" title="{{ transcription.audio_file.name }}">
+                        <a href="{{ transcription.audio_file.url }}" class="text-blue-500 hover:underline">
+                            {{ transcription.audio_file.name }}
+                        </a>
+                    </td>
+                    <td class="py-2 px-4 border-b">
+                        {% if transcription.status == "DONE" %}
+                            <span class="px-2 py-1 rounded text-xs bg-green-100 text-green-700">DONE</span>
+                        {% elif transcription.status == "PROCESSING" %}
+                            <span class="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700">PROCESSING</span>
+                        {% elif transcription.status == "ERROR" %}
+                            <span class="px-2 py-1 rounded text-xs bg-red-100 text-red-700">ERROR</span>
+                        {% elif transcription.status == "CANCELLED" %}
+                            <span class="px-2 py-1 rounded text-xs bg-gray-200 text-gray-700">CANCELLED</span>
+                        {% else %}
+                            <span class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">{{ transcription.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="py-2 px-4 border-b">
+                        {{ transcription.uploaded_at|timesince }} ago
+                    </td>
+                    <td class="py-2 px-4 border-b text-center flex flex-wrap justify-center gap-2">
+                        <a href="{% url 'transcription:transcription_detail' transcription.id %}" 
+                           class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded">
+                           View
+                        </a>
+                        {% if transcription.status == "PROCESSING" %}
+                            <a href="{% url 'transcription:processing_dashboard' %}" 
+                               class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded">
+                               Processing
+                            </a>
+                        {% endif %}
+                        <form method="POST" action="{% url 'transcription:delete_transcription' transcription.id %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" 
+                                    class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
+                                    onclick="return confirm('Are you sure you want to delete this transcription and audio file?');">
+                                Delete
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center py-4">No transcriptions available.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    </form>
+
+    {% if page_obj.has_other_pages %}
+    <div class="mt-4 flex items-center gap-2">
+        {% if page_obj.has_previous %}
+            <a class="px-3 py-1 border rounded" href="?q={{ q }}&status={{ status_filter }}&sort={{ sort }}&page_size={{ page_size }}&page={{ page_obj.previous_page_number }}">
+                Prev
+            </a>
+        {% endif %}
+        <span class="text-sm text-gray-600">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a class="px-3 py-1 border rounded" href="?q={{ q }}&status={{ status_filter }}&sort={{ sort }}&page_size={{ page_size }}&page={{ page_obj.next_page_number }}">
+                Next
+            </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+const selectAll = document.getElementById("selectAll");
+const selectAllBtn = document.getElementById("selectAllBtn");
+const selectNoneBtn = document.getElementById("selectNoneBtn");
+const rowCheckboxes = Array.from(document.querySelectorAll(".row-checkbox"));
+if (selectAll) {
+    selectAll.addEventListener("change", () => {
+        rowCheckboxes.forEach(cb => {
+            cb.checked = selectAll.checked;
+        });
+    });
+}
+if (selectAllBtn) {
+    selectAllBtn.addEventListener("click", () => {
+        rowCheckboxes.forEach(cb => (cb.checked = true));
+        if (selectAll) selectAll.checked = true;
+    });
+}
+if (selectNoneBtn) {
+    selectNoneBtn.addEventListener("click", () => {
+        rowCheckboxes.forEach(cb => (cb.checked = false));
+        if (selectAll) selectAll.checked = false;
+    });
+}
+</script>
+{% endblock %}

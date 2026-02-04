@@ -1,0 +1,91 @@
+{% extends "transcription/base.html" %}
+{% block title %}Upload{% endblock %}
+{% block page_title %}Upload Interview{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border p-6">
+
+    <p class="text-slate-500 mb-6">
+        Supported formats: <strong>MP3, WAV, M4A</strong><br>
+        Maximum file size: 200MB
+    </p>
+
+    <!-- Drag-and-Drop Upload -->
+    <form method="post" enctype="multipart/form-data" class="space-y-4" id="uploadForm">
+        {% csrf_token %}
+        <div id="dropZone"
+             class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition">
+            <p class="text-gray-500">Drag & drop your audio here, or click to select a file</p>
+            <input type="file" name="audio_file" id="fileInput" accept=".mp3,.wav,.m4a" class="hidden" required>
+        </div>
+
+        <button type="submit"
+                class="w-full bg-indigo-600 text-white py-2.5 rounded-lg hover:bg-indigo-700 transition">
+            Upload & Transcribe
+        </button>
+    </form>
+
+    <!-- File info / error messages -->
+    <p id="fileInfo" class="mt-2 text-sm text-gray-600"></p>
+    <p id="fileError" class="mt-2 text-sm text-red-600"></p>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileInfo = document.getElementById('fileInfo');
+const fileError = document.getElementById('fileError');
+
+const MAX_SIZE_MB = 200;
+
+// Click to open file selector
+dropZone.addEventListener('click', () => fileInput.click());
+
+// Drag-over visual
+dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('border-blue-500', 'bg-blue-50');
+});
+dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+});
+
+// Handle file drop
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+
+    const file = e.dataTransfer.files[0];
+    handleFile(file);
+});
+
+// Handle manual selection
+fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    handleFile(file);
+});
+
+// File validation
+function handleFile(file) {
+    fileError.innerText = '';
+    fileInfo.innerText = '';
+
+    if (!file) return;
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['mp3', 'wav', 'm4a'].includes(ext)) {
+        fileError.innerText = 'Invalid file format. Use MP3, WAV, or M4A.';
+        fileInput.value = '';
+        return;
+    }
+
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+        fileError.innerText = `File is too large. Maximum size is ${MAX_SIZE_MB}MB.`;
+        fileInput.value = '';
+        return;
+    }
+
+    fileInfo.innerText = `Selected file: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`;
+}
+</script>
+{% endblock %}

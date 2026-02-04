@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Transcriber{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 text-gray-800">
+
+<div class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white border-b shadow-sm">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-semibold">
+                Interview Transcriber
+            </h1>
+
+            <nav class="flex gap-6 text-sm font-medium">
+                <a href="{% url 'transcription:upload_audio' %}"
+                   class="text-blue-600 hover:underline">
+                    Upload
+                </a>
+                <a href="{% url 'transcription:processing_dashboard' %}"
+                   class="text-blue-600 hover:underline">
+                    Processing
+                </a>
+                <a href="{% url 'transcription:list_transcriptions' %}"
+                   class="text-blue-600 hover:underline">
+                    Interviews
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <main class="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t">
+        <div class="max-w-7xl mx-auto px-6 py-4 text-sm text-gray-500">
+            © {{ now|date:"Y" }} Abraham's Transcriber
+        </div>
+    </footer>
+
+</div>
+
+</body>
+</html>

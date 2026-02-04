@@ -1,0 +1,298 @@
+{% extends "transcription/base.html" %}
+{% block title %}Review Interview{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-semibold mb-4">Interview Review</h2>
+
+<!-- Audio Player -->
+{% if audio_exists %}
+<div class="bg-white rounded-lg shadow p-4 mb-6">
+    <audio id="audioPlayer" controls class="w-full" src="{{ transcription.audio_file.url }}"></audio>
+</div>
+{% else %}
+<div class="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 mb-6">
+    <p class="mb-2">Audio file not found. It may have been deleted from the server.</p>
+    <a href="{% url 'transcription:upload_audio' %}"
+       class="inline-flex items-center rounded bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700 text-sm font-semibold">
+        Re-upload Audio
+    </a>
+</div>
+{% endif %}
+
+<!-- ACTION BAR -->
+<div id="actionBar" class="bg-white p-4 flex flex-wrap items-center gap-4 border-b border-gray-200 rounded-lg shadow">
+    <!-- Export Dropdown -->
+    <div class="relative inline-block text-left">
+        <button id="exportBtn" class="inline-flex justify-center gap-x-1.5 rounded-md bg-gray-100 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-gray-200">
+            Export
+            <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 -mr-1 text-gray-500">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+            </svg>
+        </button>
+
+        <!-- Export menu -->
+        <div id="exportMenu" class="hidden absolute mt-2 w-48 rounded-md bg-white shadow-lg border border-gray-200 py-2 z-50">
+            <!-- Options: format, timestamps, speakers -->
+            <div class="px-4 py-2">
+                <label class="block text-gray-700 text-sm mb-1">Format:</label>
+                <select id="exportFormat" class="w-full border rounded px-2 py-1">
+                    <option value="txt">TXT</option>
+                    <option value="pdf">PDF</option>
+                    <option value="docx">DOCX</option>
+                    <option value="srt">SRT</option>
+                </select>
+            </div>
+            <div class="px-4 py-2 flex items-center gap-2">
+                <input type="checkbox" id="exportTimestamps" />
+                <label for="exportTimestamps" class="text-gray-700 text-sm">Include Timestamps</label>
+            </div>
+            <div class="px-4 py-2 flex items-center gap-2">
+                <input type="checkbox" id="exportSpeakers" />
+                <label for="exportSpeakers" class="text-gray-700 text-sm">Include Speakers</label>
+            </div>
+            <div class="px-4 py-2">
+                <button id="exportConfirmBtn" class="w-full bg-blue-600 text-white py-1 rounded hover:bg-blue-700 text-sm font-semibold">
+                    Download
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Corrections Button -->
+    <button type="submit" form="transcriptForm" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
+        Save Corrections
+    </button>
+</div>
+
+<!-- FILTER BAR (below action bar) -->
+<div class="bg-white p-4 mt-4 rounded-lg shadow flex flex-wrap gap-4 items-center">
+    <!-- Text Search -->
+    <input
+        id="searchInput"
+        type="text"
+        placeholder="Search transcript…"
+        class="border rounded px-3 py-2 w-64"
+    >
+
+    <!-- Type Filter: Question/Answer -->
+    <select id="typeFilter" class="border rounded px-3 py-2">
+        <option value="all">All</option>
+        <option value="Question">Questions</option>
+        <option value="Answer">Answers</option>
+    </select>
+
+    <!-- Speaker Filter -->
+    <select id="speakerFilter" class="border rounded px-3 py-2">
+        <option value="all">All speakers</option>
+        {% for seg in transcription.structured_segments %}
+            <option value="{{ seg.speaker }}">{{ seg.speaker }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<!-- Transcript Table -->
+<form method="post" id="transcriptForm" class="mt-6">
+{% csrf_token %}
+<div class="overflow-x-auto bg-white rounded-lg shadow mb-6">
+    <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-gray-700">
+            <tr>
+                <th class="px-4 py-3 text-left">Speaker</th>
+                <th class="px-4 py-3 text-left">Type</th>
+                <th class="px-4 py-3 text-left">Original (Kolokwa)</th>
+                <th class="px-4 py-3 text-left">Standard English</th>
+            </tr>
+        </thead>
+
+        <tbody id="transcriptBody" class="divide-y">
+            {% for seg in transcription.structured_segments %}
+
+            <!-- Timestamp row -->
+            <tr class="bg-gray-50 text-gray-500 text-xs timestamp cursor-pointer"
+                data-seconds="{{ seg.start }}">
+                <td colspan="4" class="px-4 py-2 font-mono"></td>
+            </tr>
+
+            <!-- Segment row -->
+            <tr
+                class="segment-row cursor-pointer hover:bg-blue-50 transition"
+                data-start="{{ seg.start }}"
+                data-end="{{ seg.end }}"
+                data-type="{{ seg.type }}"
+                data-speaker="{{ seg.speaker }}"
+                data-text="{{ seg.original|lower }} {{ seg.english|lower }}"
+            >
+                <td class="px-4 py-3">
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold {{ seg.speaker_color|default:'bg-gray-200 text-gray-800' }}">
+                        {{ seg.speaker }}
+                    </span>
+                </td>
+
+                <td class="px-4 py-3">
+                    {% if seg.type == 'Question' %}
+                        <span class="px-2 py-1 text-sm rounded bg-yellow-100 text-yellow-800">Question</span>
+                    {% else %}
+                        <span class="px-2 py-1 text-sm rounded bg-green-100 text-green-800">Answer</span>
+                    {% endif %}
+                </td>
+
+                <td class="px-4 py-3">
+                    <textarea
+                        rows="3"
+                        class="w-full border rounded p-2 auto-save"
+                    >{{ seg.original }}</textarea>
+                </td>
+
+                <td class="px-4 py-3">
+                    <textarea
+                        rows="3"
+                        class="w-full border rounded p-2 auto-save"
+                    >{{ seg.english }}</textarea>
+                </td>
+            </tr>
+
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</form>
+
+<script>
+// ======================
+// Global References
+// ======================
+const audio = document.getElementById("audioPlayer");
+const body = document.getElementById("transcriptBody");
+const searchInput = document.getElementById("searchInput");
+const typeFilter = document.getElementById("typeFilter");
+const speakerFilter = document.getElementById("speakerFilter");
+const exportBtn = document.getElementById('exportBtn');
+const exportMenu = document.getElementById('exportMenu');
+const exportConfirmBtn = document.getElementById('exportConfirmBtn');
+
+// Scroll-to-top button
+const scrollToTopBtn = document.createElement("button");
+scrollToTopBtn.id = "scrollToTopBtn";
+scrollToTopBtn.type = "button";
+scrollToTopBtn.textContent = "To top";
+scrollToTopBtn.className =
+    "fixed bottom-6 right-6 z-50 hidden rounded-full bg-blue-600 px-4 py-2 text-white shadow-lg hover:bg-blue-700";
+document.body.appendChild(scrollToTopBtn);
+
+scrollToTopBtn.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+window.addEventListener("scroll", () => {
+    scrollToTopBtn.classList.toggle("hidden", window.scrollY < 300);
+});
+
+// ======================
+// Format seconds to HH:MM:SS
+// ======================
+function formatTime(sec) {
+    sec = Math.floor(sec);
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return (h ? String(h).padStart(2, "0") + ":" : "") +
+           String(m).padStart(2, "0") + ":" +
+           String(s).padStart(2, "0");
+}
+
+// Fill timestamp cells
+document.querySelectorAll(".timestamp").forEach(t => {
+    t.firstElementChild.textContent = formatTime(t.dataset.seconds);
+});
+
+// ======================
+// Segment Click Handling: jump to audio time
+// ======================
+body.addEventListener("click", e => {
+    const row = e.target.closest(".segment-row, .timestamp");
+    if (!row) return;
+
+    const seconds = row.dataset.start || row.dataset.seconds;
+    if (seconds) {
+        // Clamp to audio duration to avoid errors
+        audio.currentTime = Math.min(parseFloat(seconds), audio.duration || Infinity);
+        audio.play();
+    }
+});
+
+// ======================
+// Highlight active segment during playback
+// ======================
+audio.addEventListener("timeupdate", () => {
+    document.querySelectorAll(".segment-row").forEach(r => {
+        const start = parseFloat(r.dataset.start);
+        const end = parseFloat(r.dataset.end);
+        r.classList.toggle("bg-blue-100", audio.currentTime >= start && audio.currentTime <= end);
+    });
+});
+
+// ======================
+// Export Dropdown Handling
+// ======================
+exportBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    exportMenu.classList.toggle('hidden');
+});
+
+document.addEventListener('click', (e) => {
+    if (!exportBtn.contains(e.target) && !exportMenu.contains(e.target)) {
+        exportMenu.classList.add('hidden');
+    }
+});
+
+exportConfirmBtn.addEventListener('click', () => {
+    const format = document.getElementById('exportFormat').value;
+    const timestamps = document.getElementById('exportTimestamps').checked ? "1" : "0";
+    const speakers = document.getElementById('exportSpeakers').checked ? "1" : "0";
+
+    // Use transcription filename if available
+    const filename = "{{ transcription.audio_file.name|slice:'20:'|default:'transcript' }}";
+
+    const url = `{% url 'transcription:export_transcript' transcription.id %}?format=${format}&timestamps=${timestamps}&speakers=${speakers}&filename=${filename}`;
+    window.location.href = url;
+});
+
+// ======================
+// Transcript Filtering Logic
+// ======================
+const segmentIndex = Array.from(document.querySelectorAll(".segment-row")).map(row => ({
+    row: row,
+    text: row.dataset.text.toLowerCase(),
+    type: row.dataset.type,
+    speaker: row.dataset.speaker
+}));
+
+function applyFilters() {
+    const q = searchInput.value.toLowerCase();
+    const type = typeFilter.value;
+    const speaker = speakerFilter.value;
+
+    segmentIndex.forEach(item => {
+        const matchText = item.text.includes(q);
+        const matchType = type === "all" || item.type === type;
+        const matchSpeaker = speaker === "all" || item.speaker === speaker;
+
+        const display = (matchText && matchType && matchSpeaker) ? "" : "none";
+        item.row.style.display = display;
+
+        if (item.row.previousElementSibling && item.row.previousElementSibling.classList.contains("timestamp")) {
+            item.row.previousElementSibling.style.display = display;
+        }
+    });
+}
+
+// Debounce for performance on long transcripts
+let filterTimeout;
+[searchInput, typeFilter, speakerFilter].forEach(el =>
+    el.addEventListener("input", () => {
+        clearTimeout(filterTimeout);
+        filterTimeout = setTimeout(applyFilters, 150);
+    })
+);
+</script>
+{% endblock %}
