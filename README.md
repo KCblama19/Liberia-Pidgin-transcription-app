@@ -71,6 +71,12 @@ manage.py
 - Uploaded files are stored in `media/` (ignored by git).
 - SQLite database is stored in `db.sqlite3` (ignored by git).
 
+## Screenshots
+![Upload Page](screenshots/upload-page.png)
+![Processing Page](screenshots/proceesing-page.png)
+![Transcription List](screenshots/transcription-list.png)
+![Transcription Review](screenshots/transcription-review.png)
+
 ## License
 MIT © 2026 Abraham K. Blama
 
@@ -81,3 +87,12 @@ MIT © 2026 Abraham K. Blama
 4. Use a production database (PostgreSQL recommended).
 5. Configure Redis for Celery in production.
 6. Ensure `ffmpeg` is installed on the server.
+
+## Future Roadmap
+1. GPU acceleration for faster transcription at scale.
+2. Audio storage cleanup and external storage integration (e.g., S3).
+3. Multi-user accounts and permissions.
+4. Improved error recovery and logging.
+5. Full-text search across transcripts.
+6. Export quality improvements and formatting options.
+7. Stronger security for public deployments (HTTPS, access controls).
