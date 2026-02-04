@@ -1,7 +1,10 @@
 # Transcriber Project
 
 ## Overview
-Web app for uploading audio and generating structured transcripts with a review UI.
+Web app for uploading audio and generating structured transcripts with a review UI. It supports Liberian local pidgin.
+
+Note: Transcription to Liberian Pidgin is not perfect and may contain mistakes. User review is advised.
+
 
 ## Requirements
 - Python 3.11+
@@ -12,12 +15,21 @@ Web app for uploading audio and generating structured transcripts with a review 
 1. Create and activate a virtual environment.
 2. Install dependencies:
    ```bash
+   # For Linux environment
+   pip install -r requirements.txt
+   ```
+   ```bash
+   # For Windows Environment
    pip install -r requirements.txt
    ```
 3. Set environment variables:
    ```bash
    # Windows (PowerShell)
    $env:DJANGO_SECRET_KEY="replace-with-your-secret"
+   ```
+   ```bash
+   # Linux/macOS (bash/zsh)
+   export DJANGO_SECRET_KEY="replace-with-your-secret"
    ```
 
 ## Run Django
@@ -31,9 +43,36 @@ python manage.py runserver
 celery -A transcriber_project worker --concurrency=3 --pool=prefork -l info
 ```
 
+## Quickstart
+```bash
+python -m venv venv
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
+
+## Project Structure
+```
+transcriber_project/
+  settings.py
+  urls.py
+  celery.py
+transcription/
+  exports/
+  services/
+  templates/
+  templatetags/
+  tasks.py
+  views.py
+manage.py
+```
+
 ## Notes
 - Uploaded files are stored in `media/` (ignored by git).
 - SQLite database is stored in `db.sqlite3` (ignored by git).
+
+## License
+MIT © 2026 Abraham K. Blama
 
 ## Production Checklist
 1. Set a strong `DJANGO_SECRET_KEY` in environment variables.
