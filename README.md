@@ -20,7 +20,7 @@ Note: Transcription to Liberian Pidgin is not perfect and may contain mistakes. 
    ```
    ```bash
    # For Windows Environment
-   pip install -r requirements.txt
+   pip install -r requirements_windows.txt
    ```
 3. Set environment variables:
    ```bash
