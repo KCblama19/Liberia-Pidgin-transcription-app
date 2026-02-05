@@ -7,7 +7,7 @@
 <!-- Audio Player -->
 {% if audio_exists %}
 <div class="bg-white rounded-lg shadow p-4 mb-6">
-    <audio id="audioPlayer" controls class="w-full" src="{{ transcription.audio_file.url }}"></audio>
+    <audio id="audioPlayer" controls class="w-full" src="{% url 'transcription:transcription_audio' transcription.id %}"></audio>
 </div>
 {% else %}
 <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 mb-6">
@@ -62,6 +62,12 @@
     <button type="submit" form="transcriptForm" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
         Save Corrections
     </button>
+
+    <!-- Translate to Standard English Button -->
+    <button id="translateBtn" type="button" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
+        Translate to Standard English
+    </button>
+    <span id="translateStatus" class="text-sm text-gray-600"></span>
 </div>
 
 <!-- FILTER BAR (below action bar) -->
@@ -116,6 +122,7 @@
             <!-- Segment row -->
             <tr
                 class="segment-row cursor-pointer hover:bg-blue-50 transition"
+                data-index="{{ forloop.counter0 }}"
                 data-start="{{ seg.start }}"
                 data-end="{{ seg.end }}"
                 data-type="{{ seg.type }}"
@@ -139,14 +146,16 @@
                 <td class="px-4 py-3">
                     <textarea
                         rows="3"
-                        class="w-full border rounded p-2 auto-save"
+                        class="w-full rounded-md border border-gray-200 bg-[linear-gradient(to_bottom,transparent_24px,#f3f4f6_25px)] bg-[length:100%_25px] p-3 text-sm text-gray-800 shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition auto-save"
+                        data-field="original"
                     >{{ seg.original }}</textarea>
                 </td>
 
                 <td class="px-4 py-3">
                     <textarea
                         rows="3"
-                        class="w-full border rounded p-2 auto-save"
+                        class="w-full rounded-md border border-gray-200 bg-[linear-gradient(to_bottom,transparent_24px,#f3f4f6_25px)] bg-[length:100%_25px] p-3 text-sm text-gray-800 shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition auto-save"
+                        data-field="english"
                     >{{ seg.english }}</textarea>
                 </td>
             </tr>
@@ -169,6 +178,8 @@ const speakerFilter = document.getElementById("speakerFilter");
 const exportBtn = document.getElementById('exportBtn');
 const exportMenu = document.getElementById('exportMenu');
 const exportConfirmBtn = document.getElementById('exportConfirmBtn');
+const translateBtn = document.getElementById("translateBtn");
+const translateStatus = document.getElementById("translateStatus");
 
 // Scroll-to-top button
 const scrollToTopBtn = document.createElement("button");
@@ -209,15 +220,32 @@ document.querySelectorAll(".timestamp").forEach(t => {
 // Segment Click Handling: jump to audio time
 // ======================
 body.addEventListener("click", e => {
+    if (e.target.closest("textarea, button, input, select, a")) {
+        return;
+    }
     const row = e.target.closest(".segment-row, .timestamp");
     if (!row) return;
 
     const seconds = row.dataset.start || row.dataset.seconds;
-    if (seconds) {
-        // Clamp to audio duration to avoid errors
-        audio.currentTime = Math.min(parseFloat(seconds), audio.duration || Infinity);
-        audio.play();
+    if (!seconds) return;
+
+    const target = Math.min(parseFloat(seconds), audio.duration || Infinity);
+    const rowStart = parseFloat(row.dataset.start || row.dataset.seconds || "0");
+    const rowEnd = parseFloat(row.dataset.end || rowStart);
+
+    const isWithinRow = audio.currentTime >= rowStart && audio.currentTime <= rowEnd;
+
+    if (isWithinRow) {
+        if (!audio.paused) {
+            audio.pause();
+        } else {
+            audio.play();
+        }
+        return;
     }
+
+    audio.currentTime = target;
+    audio.play();
 });
 
 // ======================
@@ -266,6 +294,86 @@ const segmentIndex = Array.from(document.querySelectorAll(".segment-row")).map(r
     type: row.dataset.type,
     speaker: row.dataset.speaker
 }));
+
+// ======================
+// Auto-save logic
+// ======================
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(";").shift();
+    return null;
+}
+
+const csrfToken = getCookie("csrftoken");
+const saveTimers = new Map();
+
+function scheduleSave(textarea) {
+    const row = textarea.closest(".segment-row");
+    if (!row) return;
+    const index = row.dataset.index;
+    const field = textarea.dataset.field;
+    const value = textarea.value;
+
+    if (saveTimers.has(textarea)) {
+        clearTimeout(saveTimers.get(textarea));
+    }
+
+    saveTimers.set(
+        textarea,
+        setTimeout(async () => {
+            try {
+                await fetch("{% url 'transcription:save_segment' transcription.id %}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrfToken || "",
+                    },
+                    body: JSON.stringify({ index, field, value }),
+                });
+                textarea.classList.add("ring-2", "ring-green-200");
+                setTimeout(() => textarea.classList.remove("ring-2", "ring-green-200"), 600);
+            } catch (err) {
+                textarea.classList.add("ring-2", "ring-red-200");
+                setTimeout(() => textarea.classList.remove("ring-2", "ring-red-200"), 1000);
+            }
+        }, 500)
+    );
+}
+
+document.querySelectorAll(".auto-save").forEach(textarea => {
+    textarea.addEventListener("input", () => scheduleSave(textarea));
+});
+
+// ======================
+// LLM Translate Button
+// ======================
+translateBtn.addEventListener("click", async () => {
+    translateStatus.textContent = "Translation is not enabled yet.";
+    return;
+    translateBtn.disabled = true;
+    translateBtn.classList.add("opacity-70", "cursor-not-allowed");
+    translateStatus.textContent = "Translating...";
+    try {
+        const res = await fetch("{% url 'transcription:translate_transcription' transcription.id %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken || "",
+            },
+        });
+        if (!res.ok) {
+            throw new Error("Translation failed");
+        }
+        translateStatus.textContent = "Done. Refreshing...";
+        window.location.reload();
+    } catch (err) {
+        translateStatus.textContent = "Translation failed. Please try again.";
+    } finally {
+        translateBtn.disabled = false;
+        translateBtn.classList.remove("opacity-70", "cursor-not-allowed");
+    }
+});
 
 function applyFilters() {
     const q = searchInput.value.toLowerCase();

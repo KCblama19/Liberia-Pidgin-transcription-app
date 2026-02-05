@@ -155,17 +155,32 @@ function getCookie(name) {
 const csrfToken = getCookie("csrftoken");
 
 const maxFakeProgress = 90;
+const smoothStep = 2;
+
+function setProgress(card, value) {
+    const progressBar = card.querySelector(".progress-bar");
+    const progressText = card.querySelector(".progress-text");
+    const next = Math.max(0, Math.min(99, value));
+    progressBar.dataset.progress = String(next);
+    progressBar.style.width = next + "%";
+    progressText.textContent = Math.floor(next) + "%";
+}
+
+function smoothToward(card, target) {
+    const progressBar = card.querySelector(".progress-bar");
+    const current = parseFloat(progressBar.dataset.progress || "0");
+    if (current >= target) return;
+    const next = Math.min(target, current + smoothStep);
+    setProgress(card, next);
+}
 
 function tick(card) {
     const progressBar = card.querySelector(".progress-bar");
-    const progressText = card.querySelector(".progress-text");
     const current = parseFloat(progressBar.dataset.progress || "0");
     if (current < maxFakeProgress) {
         let next = current + Math.random() * 2;
         if (next > maxFakeProgress) next = maxFakeProgress;
-        progressBar.dataset.progress = String(next);
-        progressBar.style.width = next + "%";
-        progressText.textContent = Math.floor(next) + "%";
+        setProgress(card, next);
     }
 }
 
@@ -248,9 +263,7 @@ async function pollOne(card) {
         } else {
             const realProgress = Math.min(Number(data.progress || 0), 99);
             if (realProgress > 0) {
-                progressBar.style.width = realProgress + "%";
-                progressText.textContent = Math.floor(realProgress) + "%";
-                progressBar.dataset.progress = String(realProgress);
+                smoothToward(card, realProgress);
             } else {
                 tick(card);
             }

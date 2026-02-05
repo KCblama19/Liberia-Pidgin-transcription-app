@@ -4,7 +4,7 @@ from .audio_chunker import chunk_audio
 from .transcriber import transcribe_chunk
 from .cancel import get_cancel_event
 from .interview_intelligence import build_segments
-from .kolokwa_normalizer import normalize
+from .regex_normalizer import normalize_text
 
 CHUNK_SECONDS = 600
 MAX_TRANSCRIBE_WORKERS = 2
@@ -52,7 +52,7 @@ def process_transcription(transcription_id: int, fast_mode=True):
         # Build structured segments (with speaker/type) and normalize English
         structured_segments = build_segments(
             raw_segments,
-            normalizer_func=normalize,
+            normalizer_func=normalize_text,
             offset=offset
         )
 

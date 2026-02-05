@@ -7,6 +7,7 @@ urlpatterns = [
     path("", upload_audio, name="upload_audio"),
     path("list/", list_transcriptions, name="list_transcriptions"),
     path("transcription/<int:pk>/", transcription_detail, name="transcription_detail"),
+    path("transcription/<int:pk>/audio/", transcription_audio, name="transcription_audio"),
     path("export/<int:transcript_id>/", export_transcript, name="export_transcript"),
     path("processing/", processing_dashboard, name="processing_dashboard"),
     path("transcription/<int:pk>/processing/", transcription_processing, name="transcription_processing"),

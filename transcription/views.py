@@ -2,14 +2,15 @@ import json
 
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, JsonResponse
+import mimetypes
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import Transcription
 from .forms import TranscriptionUploadForm
 from .tasks import process_transcription_task, cancel_transcription_task
-from .services.translator import translate_text
+from .services.llm_normalizer import llm_normalize_to_standard_english
 from .exports.manager import ExportManager
 
 
@@ -105,9 +106,16 @@ def transcription_status(request, pk):
 def translate_transcription(request, pk):
     transcription = get_object_or_404(Transcription, pk=pk)
 
-    # Placeholder logic
-    transcription.status = "TRANSLATED"
-    transcription.save(update_fields=["status"])
+    segments = transcription.structured_segments or []
+    updated = []
+    for seg in segments:
+        source_text = seg.get("english") or seg.get("original") or ""
+        normalized = llm_normalize_to_standard_english(source_text)
+        seg["english"] = normalized
+        updated.append(seg)
+
+    transcription.structured_segments = updated
+    transcription.save(update_fields=["structured_segments"])
 
     return JsonResponse({"ok": True})
 
@@ -196,6 +204,66 @@ def transcription_detail(request, pk):
     )
 
 
+def transcription_audio(request, pk):
+    transcription = get_object_or_404(Transcription, pk=pk)
+    if not transcription.audio_file or not os.path.exists(transcription.audio_file.path):
+        return HttpResponse(status=404)
+
+    file_path = transcription.audio_file.path
+    file_size = os.path.getsize(file_path)
+    range_header = request.headers.get("Range", "").strip()
+
+    def file_iter(start, length, chunk_size=8192):
+        with open(file_path, "rb") as f:
+            f.seek(start)
+            remaining = length
+            while remaining > 0:
+                read_size = min(chunk_size, remaining)
+                data = f.read(read_size)
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    content_type, _ = mimetypes.guess_type(file_path)
+    if content_type is None:
+        content_type = "application/octet-stream"
+
+    if range_header.startswith("bytes="):
+        try:
+            range_value = range_header.replace("bytes=", "")
+            start_str, end_str = range_value.split("-", 1)
+            start = int(start_str) if start_str else 0
+            end = int(end_str) if end_str else file_size - 1
+        except Exception:
+            return HttpResponse(status=416)
+
+        if start >= file_size:
+            return HttpResponse(status=416)
+
+        end = min(end, file_size - 1)
+        length = end - start + 1
+        response = StreamingHttpResponse(
+            file_iter(start, length),
+            status=206,
+            content_type=content_type,
+        )
+        response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+        response["Accept-Ranges"] = "bytes"
+        response["Content-Length"] = str(length)
+        response["Cache-Control"] = "private, max-age=3600"
+        return response
+
+    response = StreamingHttpResponse(
+        file_iter(0, file_size),
+        content_type=content_type,
+    )
+    response["Accept-Ranges"] = "bytes"
+    response["Content-Length"] = str(file_size)
+    response["Cache-Control"] = "private, max-age=3600"
+    return response
+
+
 @csrf_exempt
 def save_segment(request, pk):
     """
@@ -208,7 +276,10 @@ def save_segment(request, pk):
 
     try:
         data = json.loads(request.body)
-        index = data["index"]
+        try:
+            index = int(data["index"])
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "Invalid index"}, status=400)
         field = data["field"]  # 'original' or 'english'
         value = data["value"]
 

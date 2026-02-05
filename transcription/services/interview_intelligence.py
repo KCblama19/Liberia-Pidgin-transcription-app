@@ -1,5 +1,5 @@
 import re
-from .kolokwa_normalizer import normalize
+from .regex_normalizer import normalize_text
 
 def detect_speaker(text: str) -> str:
     match = re.search(r"\b(P\d+)\b", text)
@@ -9,7 +9,7 @@ def is_question(text: str) -> bool:
     t = text.lower()
     return "?" in t or any(q in t for q in ("what", "why", "how", "when", "where", "who"))
 
-def build_segments(raw_segments: list, normalizer_func=normalize, offset: float = 0.0) -> list:
+def build_segments(raw_segments: list, normalizer_func=normalize_text, offset: float = 0.0) -> list:
     """
     Convert raw Whisper segments into structured interview segments with type and speaker color.
     """

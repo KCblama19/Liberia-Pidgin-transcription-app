@@ -5,6 +5,8 @@ Web app for uploading audio and generating structured transcripts with a review 
 
 Note: Transcription to Liberian Pidgin is not perfect and may contain mistakes. User review is advised.
 
+The translation pipeline is intentionally designed to allow optional LLM-based semantic normalization in the future. This feature is currently disabled to avoid external dependencies and costs.
+
 
 ## Requirements
 - Python 3.11+
@@ -31,6 +33,19 @@ Note: Transcription to Liberian Pidgin is not perfect and may contain mistakes. 
    # Linux/macOS (bash/zsh)
    export DJANGO_SECRET_KEY="replace-with-your-secret"
    ```
+
+## Optional LLM Normalization (Disabled by Default)
+If you want to enable LLM-based normalization:
+
+1. Set environment variables:
+   ```bash
+   LLM_API_URL="https://api.openai.com/v1/chat/completions"
+   LLM_API_KEY="your-api-key"
+   LLM_MODEL="gpt-4o-mini"
+   ```
+2. Update the UI to allow translation requests (the current UI shows a disabled message).
+
+This will allow the "Translate to Standard English" button to call the LLM for semantic normalization.
 
 ## Run Django
 ```bash
@@ -96,3 +111,13 @@ MIT © 2026 Abraham K. Blama
 5. Full-text search across transcripts.
 6. Export quality improvements and formatting options.
 7. Stronger security for public deployments (HTTPS, access controls).
+
+## Version Update Log
+- 2026-02-05:
+  - Added processing dashboard with multi-job tracking, cancel/retry, ETA, and status badges.
+  - Added range-enabled audio streaming for long-file seeking.
+  - Added auto-save for segment edits.
+  - Added upload queue with sequential multi-file uploads, progress, cancel, and remove.
+  - Added list view filters, sort, pagination, and bulk delete.
+  - Added regex normalization engine and tests.
+  - Added project docs updates, screenshots, and license.
