@@ -2,32 +2,34 @@
 {% block title %}Processing Audio{% endblock %}
 
 {% block content %}
-<h2 class="text-2xl font-semibold mb-2">Processing Interviews</h2>
-<p class="text-sm text-gray-600 mb-3">
-    {{ stats.active }} active • {{ stats.done }} done • {{ stats.error }} error • {{ stats.cancelled }} cancelled
-</p>
-<div class="mb-4 flex flex-wrap gap-2">
-    <button
-        id="retryAllBtn"
-        type="button"
-        class="text-sm font-semibold px-3 py-1.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-    >
-        Retry All Failed
-    </button>
-    <button
-        id="cancelAllBtn"
-        type="button"
-        class="text-sm font-semibold px-3 py-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200"
-    >
-        Cancel All
-    </button>
-    <button
-        id="toggleFinishedBtn"
-        type="button"
-        class="text-sm font-semibold px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
-    >
-        Hide Finished
-    </button>
+<div class="sticky top-4 z-10 bg-slate-50/90 backdrop-blur rounded-lg p-4 border shadow-sm mb-4">
+    <h2 class="text-2xl font-semibold mb-2">Processing Interviews</h2>
+    <p class="text-sm text-gray-600 mb-3">
+        {{ stats.active }} active • {{ stats.done }} done • {{ stats.error }} error • {{ stats.cancelled }} cancelled
+    </p>
+    <div class="flex flex-wrap gap-2">
+        <button
+            id="retryAllBtn"
+            type="button"
+            class="text-sm font-semibold px-3 py-1.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+        >
+            Retry All Failed
+        </button>
+        <button
+            id="cancelAllBtn"
+            type="button"
+            class="text-sm font-semibold px-3 py-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200"
+        >
+            Cancel All
+        </button>
+        <button
+            id="toggleFinishedBtn"
+            type="button"
+            class="text-sm font-semibold px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+        >
+            Hide Finished
+        </button>
+    </div>
 </div>
 
 <div class="space-y-4">
@@ -313,7 +315,8 @@ async function pollOne(card) {
     } catch (err) {
         console.error("Error polling status:", err);
     } finally {
-        setTimeout(() => pollOne(card), 1000);
+        const nextDelay = document.visibilityState === "hidden" ? 3000 : 1000;
+        setTimeout(() => pollOne(card), nextDelay);
     }
 }
 

@@ -7,6 +7,8 @@ Note: Transcription to Liberian Pidgin is not perfect and may contain mistakes. 
 
 The translation pipeline is intentionally designed to allow optional LLM-based semantic normalization in the future. This feature is currently disabled to avoid external dependencies and costs.
 
+This project started as an exploratory, fast-iteration build driven by experimentation and intuition.
+
 
 ## Requirements
 - Python 3.11+
@@ -121,3 +123,10 @@ MIT © 2026 Abraham K. Blama
   - Added list view filters, sort, pagination, and bulk delete.
   - Added regex normalization engine and tests.
   - Added project docs updates, screenshots, and license.
+- 2026-02-06:
+  - Added regex normalization engine integration and improved Kolokwa rules.
+  - Added range-aware audio playback for segment seeking.
+  - Added detail view UX upgrades: dual-pane layout, card-based segments, tooltips, and match navigation.
+  - Added upload UX upgrades: multi-file queue, preview, duration, AAC support, and confirmations.
+  - Added processing UX performance tweaks and visibility-aware polling.
+  - Added tests and documentation updates.

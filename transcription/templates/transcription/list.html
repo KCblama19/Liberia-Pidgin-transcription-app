@@ -52,6 +52,24 @@
         </a>
     </form>
 
+    <div class="mb-4 flex flex-wrap gap-2 text-sm">
+        <a href="?status=all" class="px-3 py-1 rounded border {% if status_filter == 'all' %}bg-blue-50 text-blue-700 border-blue-200{% else %}bg-white text-gray-700 border-gray-200{% endif %}">
+            All
+        </a>
+        <a href="?status=PROCESSING" class="px-3 py-1 rounded border {% if status_filter == 'PROCESSING' %}bg-blue-50 text-blue-700 border-blue-200{% else %}bg-white text-gray-700 border-gray-200{% endif %}">
+            Processing
+        </a>
+        <a href="?status=DONE" class="px-3 py-1 rounded border {% if status_filter == 'DONE' %}bg-green-50 text-green-700 border-green-200{% else %}bg-white text-gray-700 border-gray-200{% endif %}">
+            Done
+        </a>
+        <a href="?status=ERROR" class="px-3 py-1 rounded border {% if status_filter == 'ERROR' %}bg-red-50 text-red-700 border-red-200{% else %}bg-white text-gray-700 border-gray-200{% endif %}">
+            Error
+        </a>
+        <a href="?status=CANCELLED" class="px-3 py-1 rounded border {% if status_filter == 'CANCELLED' %}bg-gray-100 text-gray-700 border-gray-200{% else %}bg-white text-gray-700 border-gray-200{% endif %}">
+            Cancelled
+        </a>
+    </div>
+
     <form method="POST" action="{% url 'transcription:delete_transcriptions_bulk' %}">
         {% csrf_token %}
         <div class="mb-4 flex items-center gap-2">

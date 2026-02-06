@@ -2,8 +2,12 @@ import re
 from .regex_normalizer import normalize_text
 
 def detect_speaker(text: str) -> str:
-    match = re.search(r"\b(P\d+)\b", text)
-    return match.group(1) if match else "UNKNOWN"
+    """
+    Detect explicit speaker tags only at the start of the segment, e.g. "P1:" or "P2 -".
+    Avoid matching tags that appear inside normal sentences.
+    """
+    match = re.match(r"^\s*(P\d+)\b(\s*[:\-])?", text, flags=re.IGNORECASE)
+    return match.group(1).upper() if match else "UNKNOWN"
 
 def is_question(text: str) -> bool:
     t = text.lower()
@@ -14,11 +18,19 @@ def build_segments(raw_segments: list, normalizer_func=normalize_text, offset: f
     Convert raw Whisper segments into structured interview segments with type and speaker color.
     """
     structured = []
+    consecutive_unknown_questions = 0
 
     for i, s in enumerate(raw_segments):
         text = s.get("text") or s.get("original") or ""
         speaker = detect_speaker(text)
         segment_type = "Question" if is_question(text) else "Answer"
+
+        if speaker == "UNKNOWN" and segment_type == "Question":
+            consecutive_unknown_questions += 1
+            if consecutive_unknown_questions >= 2:
+                speaker = "INTERVIEWER"
+        else:
+            consecutive_unknown_questions = 0
 
         # Assign a color for each speaker
         color_classes = [

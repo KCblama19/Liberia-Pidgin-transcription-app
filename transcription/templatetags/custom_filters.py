@@ -1,4 +1,5 @@
 from django import template
+import os
 
 register = template.Library()
 
@@ -10,3 +11,11 @@ def time_format(value):
     minutes = int(value // 60)
     seconds = int(value % 60)
     return f"{minutes:02d}:{seconds:02d}"
+
+
+@register.filter
+def basename(value):
+    """Return the base filename without any path."""
+    if not value:
+        return ""
+    return os.path.basename(str(value))

@@ -1,16 +1,23 @@
 {% extends "transcription/base.html" %}
+{% load custom_filters %}
 {% block title %}Review Interview{% endblock %}
 
 {% block content %}
-<h2 class="text-2xl font-semibold mb-4">Interview Review</h2>
+<h2 class="text-2xl font-semibold mb-1">Interview Review</h2>
+<p class="text-sm text-gray-600 mb-6">
+    File: <span class="font-medium text-gray-800">{{ transcription.audio_file.name|basename|default:"(no file)" }}</span>
+</p>
+
+<div class="grid gap-6 lg:grid-cols-[360px_1fr]">
+    <div class="space-y-4 lg:sticky lg:top-6 lg:self-start">
 
 <!-- Audio Player -->
 {% if audio_exists %}
-<div class="bg-white rounded-lg shadow p-4 mb-6">
+<div class="bg-white rounded-lg shadow p-4">
     <audio id="audioPlayer" controls class="w-full" src="{% url 'transcription:transcription_audio' transcription.id %}"></audio>
 </div>
 {% else %}
-<div class="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 mb-6">
+<div class="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4">
     <p class="mb-2">Audio file not found. It may have been deleted from the server.</p>
     <a href="{% url 'transcription:upload_audio' %}"
        class="inline-flex items-center rounded bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700 text-sm font-semibold">
@@ -20,7 +27,7 @@
 {% endif %}
 
 <!-- ACTION BAR -->
-<div id="actionBar" class="bg-white p-4 flex flex-wrap items-center gap-4 border-b border-gray-200 rounded-lg shadow">
+<div id="actionBar" class="bg-white p-4 flex flex-wrap items-center gap-4 border border-gray-100 rounded-lg shadow-sm">
     <!-- Export Dropdown -->
     <div class="relative inline-block text-left">
         <button id="exportBtn" class="inline-flex justify-center gap-x-1.5 rounded-md bg-gray-100 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-gray-200">
@@ -59,7 +66,7 @@
     </div>
 
     <!-- Save Corrections Button -->
-    <button type="submit" form="transcriptForm" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
+    <button type="submit" form="transcriptForm" class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700">
         Save Corrections
     </button>
 
@@ -68,10 +75,47 @@
         Translate to Standard English
     </button>
     <span id="translateStatus" class="text-sm text-gray-600"></span>
+    <span id="saveStatus" class="text-xs px-2 py-1 rounded bg-slate-100 text-slate-600"></span>
+
+    <div class="flex items-center gap-3">
+        <label class="inline-flex items-center gap-2 text-sm text-gray-600 relative group">
+            <input id="loopToggle" type="checkbox">
+            Loop Segment
+            <span class="absolute -top-11 left-1/2 hidden w-max -translate-x-1/2 rounded bg-slate-800 px-2 py-1 text-xs text-white shadow-sm group-hover:block transition-opacity duration-150 opacity-0 group-hover:opacity-100">
+                Repeat the active segment in a loop
+                <span class="absolute left-1/2 top-full -translate-x-1/2 border-x-8 border-t-8 border-x-transparent border-t-slate-800"></span>
+            </span>
+        </label>
+        <button id="jumpPrev" type="button" class="text-sm text-blue-600 hover:underline relative group">
+            Prev Match
+            <span class="absolute -top-11 left-1/2 hidden w-max -translate-x-1/2 rounded bg-slate-800 px-2 py-1 text-xs text-white shadow-sm group-hover:block transition-opacity duration-150 opacity-0 group-hover:opacity-100">
+                Jump to previous search match
+                <span class="absolute left-1/2 top-full -translate-x-1/2 border-x-8 border-t-8 border-x-transparent border-t-slate-800"></span>
+            </span>
+        </button>
+        <button id="jumpNext" type="button" class="text-sm text-blue-600 hover:underline relative group">
+            Next Match
+            <span class="absolute -top-11 left-1/2 hidden w-max -translate-x-1/2 rounded bg-slate-800 px-2 py-1 text-xs text-white shadow-sm group-hover:block transition-opacity duration-150 opacity-0 group-hover:opacity-100">
+                Jump to next search match
+                <span class="absolute left-1/2 top-full -translate-x-1/2 border-x-8 border-t-8 border-x-transparent border-t-slate-800"></span>
+            </span>
+        </button>
+    </div>
+
+    <div class="flex items-center gap-3 text-sm text-gray-600">
+        <label class="flex items-center gap-2">
+            <input id="toggleOriginal" type="checkbox" checked>
+            Original
+        </label>
+        <label class="flex items-center gap-2">
+            <input id="toggleEnglish" type="checkbox" checked>
+            Standard English
+        </label>
+    </div>
 </div>
 
 <!-- FILTER BAR (below action bar) -->
-<div class="bg-white p-4 mt-4 rounded-lg shadow flex flex-wrap gap-4 items-center">
+<div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center">
     <!-- Text Search -->
     <input
         id="searchInput"
@@ -97,74 +141,78 @@
 </div>
 
 <!-- Transcript Table -->
-<form method="post" id="transcriptForm" class="mt-6">
+    </div>
+
+    <div>
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-lg font-semibold text-gray-800">Segments</h3>
+            <span class="text-sm text-gray-500">{{ transcription.structured_segments|length }} total</span>
+        </div>
+<!-- Transcript Cards -->
+<form method="post" id="transcriptForm" class="mt-0">
 {% csrf_token %}
-<div class="overflow-x-auto bg-white rounded-lg shadow mb-6">
-    <table class="min-w-full text-sm">
-        <thead class="bg-gray-50 text-gray-700">
-            <tr>
-                <th class="px-4 py-3 text-left">Speaker</th>
-                <th class="px-4 py-3 text-left">Type</th>
-                <th class="px-4 py-3 text-left">Original (Kolokwa)</th>
-                <th class="px-4 py-3 text-left">Standard English</th>
-            </tr>
-        </thead>
+<div id="transcriptBody" class="space-y-4">
+    {% for seg in transcription.structured_segments %}
+    <div
+        class="segment-row bg-white rounded-lg border border-gray-100 p-4 pl-6 transition hover:shadow-md relative"
+        data-index="{{ forloop.counter0 }}"
+        data-start="{{ seg.start }}"
+        data-end="{{ seg.end }}"
+        data-type="{{ seg.type }}"
+        data-speaker="{{ seg.speaker }}"
+        data-text="{{ seg.original|lower }} {{ seg.english|lower }}"
+    >
+        <div class="absolute left-0 top-0 h-full w-1 bg-blue-200 rounded-l-lg"></div>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span class="px-2 py-1 rounded-full text-xs font-semibold {{ seg.speaker_color|default:'bg-gray-200 text-gray-800' }}">
+                    {{ seg.speaker }}
+                </span>
+                <button
+                    type="button"
+                    class="text-xs text-blue-600 hover:underline rename-speaker"
+                    data-speaker="{{ seg.speaker }}"
+                >
+                    Rename
+                </button>
+                {% if seg.type == 'Question' %}
+                    <span class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">Question</span>
+                {% else %}
+                    <span class="px-2 py-1 text-xs rounded bg-green-100 text-green-800">Answer</span>
+                {% endif %}
+            </div>
+            <button type="button" class="timestamp-chip text-xs text-gray-600 font-mono" data-seconds="{{ seg.start }}">
+                00:00
+            </button>
+        </div>
 
-        <tbody id="transcriptBody" class="divide-y">
-            {% for seg in transcription.structured_segments %}
-
-            <!-- Timestamp row -->
-            <tr class="bg-gray-50 text-gray-500 text-xs timestamp cursor-pointer"
-                data-seconds="{{ seg.start }}">
-                <td colspan="4" class="px-4 py-2 font-mono"></td>
-            </tr>
-
-            <!-- Segment row -->
-            <tr
-                class="segment-row cursor-pointer hover:bg-blue-50 transition"
-                data-index="{{ forloop.counter0 }}"
-                data-start="{{ seg.start }}"
-                data-end="{{ seg.end }}"
-                data-type="{{ seg.type }}"
-                data-speaker="{{ seg.speaker }}"
-                data-text="{{ seg.original|lower }} {{ seg.english|lower }}"
-            >
-                <td class="px-4 py-3">
-                    <span class="px-2 py-1 rounded-full text-xs font-semibold {{ seg.speaker_color|default:'bg-gray-200 text-gray-800' }}">
-                        {{ seg.speaker }}
-                    </span>
-                </td>
-
-                <td class="px-4 py-3">
-                    {% if seg.type == 'Question' %}
-                        <span class="px-2 py-1 text-sm rounded bg-yellow-100 text-yellow-800">Question</span>
-                    {% else %}
-                        <span class="px-2 py-1 text-sm rounded bg-green-100 text-green-800">Answer</span>
-                    {% endif %}
-                </td>
-
-                <td class="px-4 py-3">
-                    <textarea
-                        rows="3"
-                        class="w-full rounded-md border border-gray-200 bg-[linear-gradient(to_bottom,transparent_24px,#f3f4f6_25px)] bg-[length:100%_25px] p-3 text-sm text-gray-800 shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition auto-save"
-                        data-field="original"
-                    >{{ seg.original }}</textarea>
-                </td>
-
-                <td class="px-4 py-3">
-                    <textarea
-                        rows="3"
-                        class="w-full rounded-md border border-gray-200 bg-[linear-gradient(to_bottom,transparent_24px,#f3f4f6_25px)] bg-[length:100%_25px] p-3 text-sm text-gray-800 shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition auto-save"
-                        data-field="english"
-                    >{{ seg.english }}</textarea>
-                </td>
-            </tr>
-
-            {% endfor %}
-        </tbody>
-    </table>
+        <div class="mt-3 grid gap-3 md:grid-cols-2">
+            <div class="col-original">
+                <label class="block text-[11px] uppercase tracking-wide text-gray-500 mb-1">Original (Kolokwa)</label>
+                <textarea
+                    rows="3"
+                    class="w-full rounded-md border border-gray-200 bg-[linear-gradient(to_bottom,transparent_24px,#f3f4f6_25px)] bg-[length:100%_25px] p-3 text-sm text-gray-800 shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition auto-save"
+                    data-field="original"
+                >{{ seg.original }}</textarea>
+            </div>
+            <div class="col-english">
+                <label class="block text-[11px] uppercase tracking-wide text-gray-500 mb-1">Standard English</label>
+                <textarea
+                    rows="3"
+                    class="w-full rounded-md border border-gray-200 bg-[linear-gradient(to_bottom,transparent_24px,#f3f4f6_25px)] bg-[length:100%_25px] p-3 text-sm text-gray-800 shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition auto-save"
+                    data-field="english"
+                >{{ seg.english }}</textarea>
+            </div>
+        </div>
+    </div>
+    {% if not forloop.last %}
+    <div class="h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
+    {% endif %}
+    {% endfor %}
 </div>
 </form>
+    </div>
+</div>
 
 <script>
 // ======================
@@ -180,6 +228,12 @@ const exportMenu = document.getElementById('exportMenu');
 const exportConfirmBtn = document.getElementById('exportConfirmBtn');
 const translateBtn = document.getElementById("translateBtn");
 const translateStatus = document.getElementById("translateStatus");
+const saveStatus = document.getElementById("saveStatus");
+const toggleOriginal = document.getElementById("toggleOriginal");
+const toggleEnglish = document.getElementById("toggleEnglish");
+const loopToggle = document.getElementById("loopToggle");
+const jumpPrev = document.getElementById("jumpPrev");
+const jumpNext = document.getElementById("jumpNext");
 
 // Scroll-to-top button
 const scrollToTopBtn = document.createElement("button");
@@ -211,22 +265,26 @@ function formatTime(sec) {
            String(s).padStart(2, "0");
 }
 
-// Fill timestamp cells
-document.querySelectorAll(".timestamp").forEach(t => {
-    t.firstElementChild.textContent = formatTime(t.dataset.seconds);
+// Fill timestamp chips
+document.querySelectorAll(".timestamp-chip").forEach(t => {
+    t.textContent = formatTime(t.dataset.seconds);
 });
 
 // ======================
 // Segment Click Handling: jump to audio time
 // ======================
 body.addEventListener("click", e => {
-    if (e.target.closest("textarea, button, input, select, a")) {
+    if (e.target.closest("textarea, input, select, a")) {
         return;
     }
-    const row = e.target.closest(".segment-row, .timestamp");
+    const isTimestamp = e.target.closest(".timestamp-chip");
+    if (e.target.closest("button") && !isTimestamp) {
+        return;
+    }
+    const row = e.target.closest(".segment-row");
     if (!row) return;
 
-    const seconds = row.dataset.start || row.dataset.seconds;
+    const seconds = row.dataset.start;
     if (!seconds) return;
 
     const target = Math.min(parseFloat(seconds), audio.duration || Infinity);
@@ -248,16 +306,7 @@ body.addEventListener("click", e => {
     audio.play();
 });
 
-// ======================
-// Highlight active segment during playback
-// ======================
-audio.addEventListener("timeupdate", () => {
-    document.querySelectorAll(".segment-row").forEach(r => {
-        const start = parseFloat(r.dataset.start);
-        const end = parseFloat(r.dataset.end);
-        r.classList.toggle("bg-blue-100", audio.currentTime >= start && audio.currentTime <= end);
-    });
-});
+// (Highlighting handled in optimized playback section below)
 
 // ======================
 // Export Dropdown Handling
@@ -288,12 +337,91 @@ exportConfirmBtn.addEventListener('click', () => {
 // ======================
 // Transcript Filtering Logic
 // ======================
-const segmentIndex = Array.from(document.querySelectorAll(".segment-row")).map(row => ({
+const segmentRows = Array.from(document.querySelectorAll(".segment-row"));
+const VIRTUAL_LIMIT = 200;
+let virtualMode = segmentRows.length > VIRTUAL_LIMIT;
+let loadedCount = Math.min(VIRTUAL_LIMIT, segmentRows.length);
+
+function applyVirtualization() {
+    if (!virtualMode) return;
+    segmentRows.forEach((row, idx) => {
+        row.classList.toggle("hidden", idx >= loadedCount);
+    });
+}
+
+function loadMoreSegments() {
+    loadedCount = Math.min(loadedCount + 200, segmentRows.length);
+    applyVirtualization();
+}
+const segmentIndex = segmentRows.map(row => ({
     row: row,
     text: row.dataset.text.toLowerCase(),
     type: row.dataset.type,
     speaker: row.dataset.speaker
 }));
+const segments = segmentRows.map(row => ({
+    row,
+    start: parseFloat(row.dataset.start || "0"),
+    end: parseFloat(row.dataset.end || "0"),
+}));
+
+applyVirtualization();
+
+window.addEventListener("scroll", () => {
+    if (!virtualMode) return;
+    const nearBottom = window.innerHeight + window.scrollY > document.body.offsetHeight - 800;
+    if (nearBottom) {
+        loadMoreSegments();
+    }
+});
+let matchRows = [];
+let matchIndex = -1;
+
+function highlightMatches(query) {
+    matchRows = [];
+    matchIndex = -1;
+    document.querySelectorAll(".segment-row").forEach(r => {
+        r.classList.remove("ring-2", "ring-yellow-200");
+    });
+    if (!query) return;
+    segmentIndex.forEach(item => {
+        if (item.text.includes(query)) {
+            item.row.classList.add("ring-2", "ring-yellow-200");
+            matchRows.push(item.row);
+        }
+    });
+}
+
+function jumpToMatch(dir) {
+    if (!matchRows.length) return;
+    matchIndex = (matchIndex + dir + matchRows.length) % matchRows.length;
+    const row = matchRows[matchIndex];
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.add("ring-2", "ring-yellow-400");
+    setTimeout(() => row.classList.remove("ring-yellow-400"), 600);
+}
+
+function setSaveStatus(text) {
+    if (!saveStatus) return;
+    saveStatus.textContent = text;
+}
+
+function updateColumnVisibility() {
+    const showOriginal = toggleOriginal?.checked ?? true;
+    const showEnglish = toggleEnglish?.checked ?? true;
+    requestAnimationFrame(() => {
+        document.querySelectorAll(".col-original").forEach(el => {
+            el.classList.toggle("hidden", !showOriginal);
+        });
+        document.querySelectorAll(".col-english").forEach(el => {
+            el.classList.toggle("hidden", !showEnglish);
+        });
+    });
+}
+
+toggleOriginal?.addEventListener("change", updateColumnVisibility);
+toggleEnglish?.addEventListener("change", updateColumnVisibility);
+updateColumnVisibility();
 
 // ======================
 // Auto-save logic
@@ -333,9 +461,11 @@ function scheduleSave(textarea) {
                 });
                 textarea.classList.add("ring-2", "ring-green-200");
                 setTimeout(() => textarea.classList.remove("ring-2", "ring-green-200"), 600);
+                setSaveStatus(`Saved at ${new Date().toLocaleTimeString()}`);
             } catch (err) {
                 textarea.classList.add("ring-2", "ring-red-200");
                 setTimeout(() => textarea.classList.remove("ring-2", "ring-red-200"), 1000);
+                setSaveStatus("Save failed");
             }
         }, 500)
     );
@@ -343,6 +473,24 @@ function scheduleSave(textarea) {
 
 document.querySelectorAll(".auto-save").forEach(textarea => {
     textarea.addEventListener("input", () => scheduleSave(textarea));
+});
+
+// ======================
+// Speaker rename (client-side only)
+// ======================
+document.querySelectorAll(".rename-speaker").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const current = btn.dataset.speaker || "UNKNOWN";
+        const next = prompt("Rename speaker:", current);
+        if (!next || next.trim() === current) return;
+        document.querySelectorAll(".segment-row").forEach(row => {
+            if (row.dataset.speaker === current) {
+                row.dataset.speaker = next.trim();
+                const chip = row.querySelector("span");
+                if (chip) chip.textContent = next.trim();
+            }
+        });
+    });
 });
 
 // ======================
@@ -375,22 +523,95 @@ translateBtn.addEventListener("click", async () => {
     }
 });
 
+// ======================
+// Playback helpers (optimized)
+// ======================
+let activeSegmentRow = null;
+let activeIndex = -1;
+let lastScrollIndex = -1;
+let rafPending = false;
+
+function findActiveIndex(current, startIndex) {
+    if (!segments.length) return -1;
+    let i = Math.max(0, Math.min(startIndex, segments.length - 1));
+
+    if (current >= segments[i].start && current <= segments[i].end) {
+        return i;
+    }
+
+    // Search forward
+    for (let j = i + 1; j < segments.length; j++) {
+        if (current < segments[j].start) return j - 1;
+        if (current >= segments[j].start && current <= segments[j].end) return j;
+    }
+
+    // Search backward
+    for (let j = i - 1; j >= 0; j--) {
+        if (current >= segments[j].start && current <= segments[j].end) return j;
+        if (current > segments[j].end) return j;
+    }
+
+    return -1;
+}
+
+function updateActiveSegment() {
+    const current = audio.currentTime || 0;
+    const nextIndex = findActiveIndex(current, activeIndex === -1 ? 0 : activeIndex);
+    if (nextIndex !== activeIndex) {
+        if (activeSegmentRow) activeSegmentRow.classList.remove("bg-blue-100");
+        activeIndex = nextIndex;
+        activeSegmentRow = nextIndex >= 0 ? segments[nextIndex].row : null;
+        if (activeSegmentRow) {
+            if (virtualMode && activeIndex >= loadedCount) {
+                loadedCount = activeIndex + 1;
+                applyVirtualization();
+            }
+            activeSegmentRow.classList.add("bg-blue-100");
+            if (lastScrollIndex !== activeIndex) {
+                lastScrollIndex = activeIndex;
+                activeSegmentRow.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+    }
+
+    if (loopToggle?.checked && activeSegmentRow) {
+        const start = segments[activeIndex].start;
+        const end = segments[activeIndex].end;
+        if (current >= end) {
+            audio.currentTime = start;
+            audio.play();
+        }
+    }
+}
+
+audio.addEventListener("timeupdate", () => {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+        rafPending = false;
+        updateActiveSegment();
+    });
+});
+
+jumpPrev.addEventListener("click", () => jumpToMatch(-1));
+jumpNext.addEventListener("click", () => jumpToMatch(1));
+
 function applyFilters() {
     const q = searchInput.value.toLowerCase();
     const type = typeFilter.value;
     const speaker = speakerFilter.value;
 
-    segmentIndex.forEach(item => {
-        const matchText = item.text.includes(q);
-        const matchType = type === "all" || item.type === type;
-        const matchSpeaker = speaker === "all" || item.speaker === speaker;
+    requestAnimationFrame(() => {
+        segmentIndex.forEach(item => {
+            const matchText = item.text.includes(q);
+            const matchType = type === "all" || item.type === type;
+            const matchSpeaker = speaker === "all" || item.speaker === speaker;
 
-        const display = (matchText && matchType && matchSpeaker) ? "" : "none";
-        item.row.style.display = display;
+            const display = (matchText && matchType && matchSpeaker) ? "" : "none";
+            item.row.style.display = display;
+        });
 
-        if (item.row.previousElementSibling && item.row.previousElementSibling.classList.contains("timestamp")) {
-            item.row.previousElementSibling.style.display = display;
-        }
+        highlightMatches(q);
     });
 }
 

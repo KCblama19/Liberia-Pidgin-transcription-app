@@ -32,7 +32,7 @@ def get_model():
             if _model is None:
                 profile_settings = _get_profile_settings()
                 _model = WhisperModel(
-                    "systran/faster-whisper-small",
+                    "systran/faster-whisper-medium",
                     device=_DEVICE,
                     compute_type=_COMPUTE_TYPE,
                     cpu_threads=profile_settings["cpu_threads"],

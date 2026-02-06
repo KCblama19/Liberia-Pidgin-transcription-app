@@ -4,21 +4,22 @@
     <meta charset="UTF-8">
     <title>{% block title %}Transcriber{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gradient-to-b from-slate-50 to-slate-100 text-gray-800" style="font-family: 'Sora', ui-sans-serif;">
 
 <div class="min-h-screen flex flex-col">
 
     <!-- Header -->
-    <header class="bg-white border-b shadow-sm">
+    <header class="bg-white/90 backdrop-blur border-b shadow-sm">
         <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-semibold">
+            <h1 class="text-xl font-semibold tracking-tight">
                 Interview Transcriber
             </h1>
 
-            <nav class="flex gap-6 text-sm font-medium">
+            <nav class="flex gap-4 text-sm font-medium">
                 <a href="{% url 'transcription:upload_audio' %}"
                    class="text-blue-600 hover:underline">
                     Upload
