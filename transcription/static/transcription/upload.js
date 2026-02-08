@@ -1,0 +1,329 @@
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+const dropZoneText = document.getElementById("dropZoneText");
+const fileInfo = document.getElementById("fileInfo");
+const fileError = document.getElementById("fileError");
+const uploadForm = document.getElementById("uploadForm");
+const uploadBtn = document.getElementById("uploadBtn");
+const clearBtn = document.getElementById("clearBtn");
+const cancelUploadBtn = document.getElementById("cancelUploadBtn");
+const uploadQueue = document.getElementById("uploadQueue");
+const uploadDoneNote = document.getElementById("uploadDoneNote");
+const previewWrap = document.getElementById("previewWrap");
+const previewAudio = document.getElementById("previewAudio");
+const previewDuration = document.getElementById("previewDuration");
+
+const confirmOverlay = document.getElementById("confirmOverlay");
+const confirmTitle = document.getElementById("confirmTitle");
+const confirmMessage = document.getElementById("confirmMessage");
+const confirmCancel = document.getElementById("confirmCancel");
+const confirmOk = document.getElementById("confirmOk");
+let confirmAction = null;
+
+function openConfirm({ title, message, onConfirm }) {
+    confirmTitle.textContent = title;
+    confirmMessage.textContent = message;
+    confirmAction = onConfirm;
+    confirmOverlay.classList.remove("hidden");
+    confirmOverlay.classList.add("flex");
+}
+
+function closeConfirm() {
+    confirmAction = null;
+    confirmOverlay.classList.add("hidden");
+    confirmOverlay.classList.remove("flex");
+}
+
+confirmCancel.addEventListener("click", closeConfirm);
+confirmOverlay.addEventListener("click", (e) => {
+    if (e.target === confirmOverlay) closeConfirm();
+});
+confirmOk.addEventListener("click", () => {
+    if (typeof confirmAction === "function") confirmAction();
+    closeConfirm();
+});
+
+const MAX_SIZE_MB = 200;
+const MAX_FILES = 2;
+
+dropZone.addEventListener("click", () => fileInput.click());
+
+dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("border-blue-500", "bg-blue-50");
+    dropZoneText.textContent = "Drop to upload";
+});
+dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove("border-blue-500", "bg-blue-50");
+    dropZoneText.textContent = "Drag & drop your audio here, or click to select a file";
+});
+
+dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("border-blue-500", "bg-blue-50");
+    const files = Array.from(e.dataTransfer.files || []);
+    requestAnimationFrame(() => handleFiles(files));
+});
+
+fileInput.addEventListener("change", () => {
+    const files = Array.from(fileInput.files || []);
+    requestAnimationFrame(() => handleFiles(files));
+});
+
+let uploadItems = [];
+let queue = [];
+let currentIndex = -1;
+let activeXhr = null;
+
+function handleFiles(files) {
+    fileError.innerText = "";
+    fileInfo.innerText = "";
+
+    if (!files.length) return;
+
+    const validFiles = [];
+    const invalidFiles = [];
+
+    if (files.length > MAX_FILES) {
+        fileError.innerText = `You can upload up to ${MAX_FILES} files at a time.`;
+        files = files.slice(0, MAX_FILES);
+    }
+
+    files.forEach((file) => {
+        const ext = file.name.split(".").pop().toLowerCase();
+        if (!["mp3", "wav", "m4a", "aac"].includes(ext)) {
+            invalidFiles.push(file.name);
+            return;
+        }
+
+        if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+            invalidFiles.push(`${file.name} (too large)`);
+            return;
+        }
+        validFiles.push(file);
+    });
+
+    if (invalidFiles.length) {
+        fileError.innerText = `Some files were skipped: ${invalidFiles.join(", ")}`;
+    }
+
+    if (!validFiles.length) return;
+
+    fileInfo.innerText = `Selected ${validFiles.length} file(s).`;
+    dropZoneText.textContent = `${validFiles.length} file(s) selected`;
+    clearBtn.classList.remove("hidden");
+
+    uploadQueue.classList.remove("hidden");
+    uploadDoneNote.classList.add("hidden");
+
+    validFiles.forEach((file) => {
+        const item = createUploadItem(file);
+        uploadItems.push(item);
+        queue.push(item);
+        uploadQueue.appendChild(item.el);
+    });
+
+    const first = validFiles[0];
+    if (first) {
+        const url = URL.createObjectURL(first);
+        previewAudio.src = url;
+        previewWrap.classList.remove("hidden");
+        previewAudio.onloadedmetadata = () => {
+            const duration = Math.round(previewAudio.duration || 0);
+            if (duration) {
+                const m = Math.floor(duration / 60);
+                const s = duration % 60;
+                previewDuration.textContent = `Duration: ${m}:${String(s).padStart(2, "0")}`;
+            } else {
+                previewDuration.textContent = "";
+            }
+        };
+    }
+}
+
+function clearFile() {
+    fileInput.value = "";
+    fileInfo.innerText = "";
+    fileError.innerText = "";
+    dropZoneText.textContent = "Drag & drop your audio here, or click to select a file";
+    clearBtn.classList.add("hidden");
+    uploadQueue.classList.add("hidden");
+    uploadQueue.innerHTML = "";
+    uploadItems = [];
+    queue = [];
+    currentIndex = -1;
+    uploadDoneNote.classList.add("hidden");
+    previewWrap.classList.add("hidden");
+    previewAudio.removeAttribute("src");
+    previewDuration.textContent = "";
+}
+
+clearBtn.addEventListener("click", clearFile);
+
+function resetUploadUi() {
+    uploadBtn.disabled = false;
+    uploadBtn.classList.remove("opacity-70", "cursor-not-allowed");
+    cancelUploadBtn.classList.add("hidden");
+}
+
+cancelUploadBtn.addEventListener("click", () => {
+    openConfirm({
+        title: "Cancel Upload",
+        message: "Cancel the current upload?",
+        onConfirm: () => {
+            if (activeXhr) {
+                activeXhr.abort();
+                activeXhr = null;
+            }
+            fileError.innerText = "Upload canceled.";
+            resetUploadUi();
+        },
+    });
+});
+
+function createUploadItem(file) {
+    const el = document.createElement("div");
+    el.className = "border rounded p-3";
+
+    const header = document.createElement("div");
+    header.className = "flex items-center justify-between gap-2";
+
+    const name = document.createElement("p");
+    name.className = "text-sm font-semibold text-gray-800";
+    name.textContent = file.name;
+
+    const status = document.createElement("span");
+    status.className = "text-xs text-gray-500";
+    status.textContent = "Queued";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "text-xs text-red-600 hover:underline";
+    removeBtn.textContent = "Remove";
+
+    header.appendChild(name);
+    const right = document.createElement("div");
+    right.className = "flex items-center gap-2";
+    right.appendChild(status);
+    right.appendChild(removeBtn);
+    header.appendChild(right);
+
+    const barWrap = document.createElement("div");
+    barWrap.className = "w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden";
+    const bar = document.createElement("div");
+    bar.className = "bg-blue-600 h-2 rounded-full w-0 transition-all";
+    barWrap.appendChild(bar);
+
+    el.appendChild(header);
+    el.appendChild(barWrap);
+
+    return { file, el, status, bar, removeBtn };
+}
+
+function setItemProgress(item, percent) {
+    item.bar.style.width = percent + "%";
+    item.status.textContent = percent >= 100 ? "Done" : `Uploading ${percent}%`;
+}
+
+function markItemStatus(item, text, colorClass) {
+    item.status.textContent = text;
+    item.status.className = `text-xs ${colorClass}`;
+}
+
+function uploadNext() {
+    currentIndex += 1;
+    if (currentIndex >= queue.length) {
+        resetUploadUi();
+        uploadDoneNote.classList.remove("hidden");
+        setTimeout(() => {
+            window.location.href = "/transcription/processing/";
+        }, 1200);
+        return;
+    }
+
+    const item = queue[currentIndex];
+    markItemStatus(item, "Uploading 0%", "text-blue-600");
+
+    uploadBtn.disabled = true;
+    uploadBtn.classList.add("opacity-70", "cursor-not-allowed");
+    cancelUploadBtn.classList.remove("hidden");
+
+    const xhr = new XMLHttpRequest();
+    activeXhr = xhr;
+
+    const formData = new FormData();
+    formData.append("audio_file", item.file);
+    const csrfToken = uploadForm.querySelector("input[name='csrfmiddlewaretoken']")?.value;
+    if (csrfToken) {
+        formData.append("csrfmiddlewaretoken", csrfToken);
+    }
+
+    xhr.open("POST", uploadForm.action || window.location.href, true);
+
+    xhr.upload.addEventListener("progress", (evt) => {
+        if (evt.lengthComputable) {
+            const percent = Math.round((evt.loaded / evt.total) * 100);
+            setItemProgress(item, percent);
+        }
+    });
+
+    xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 400) {
+            setItemProgress(item, 100);
+            markItemStatus(item, "Uploaded", "text-green-600");
+            uploadNext();
+        } else {
+            markItemStatus(item, "Failed", "text-red-600");
+            resetUploadUi();
+        }
+    });
+
+    xhr.addEventListener("error", () => {
+        markItemStatus(item, "Failed", "text-red-600");
+        resetUploadUi();
+    });
+
+    xhr.addEventListener("abort", () => {
+        markItemStatus(item, "Cancelled", "text-gray-600");
+        resetUploadUi();
+    });
+
+    xhr.send(formData);
+}
+
+uploadForm.addEventListener("submit", (e) => {
+    if (!queue.length) {
+        e.preventDefault();
+        fileError.innerText = "Please select at least one file to upload.";
+        return;
+    }
+
+    e.preventDefault();
+    if (currentIndex === -1) {
+        requestAnimationFrame(() => uploadNext());
+    }
+});
+
+uploadQueue.addEventListener("click", (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (!target.classList.contains("text-red-600")) return;
+
+    const itemEl = target.closest("div.border");
+    if (!itemEl) return;
+
+    const idx = queue.findIndex(q => q.el === itemEl);
+    if (idx === -1) return;
+    openConfirm({
+        title: "Remove File",
+        message: "Remove this file from the upload queue?",
+        onConfirm: () => {
+            if (idx === currentIndex && activeXhr) {
+                activeXhr.abort();
+                activeXhr = null;
+            }
+            queue.splice(idx, 1);
+            itemEl.remove();
+        },
+    });
+});
