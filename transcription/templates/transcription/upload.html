@@ -7,7 +7,7 @@
 <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border p-6">
 
     <p class="text-slate-500 mb-6">
-        Supported formats: <strong>MP3, WAV, M4A, AAC</strong><br>
+        Supported formats: <strong>MP3, WAV, M4A, AAC, MPEG</strong><br>
         Maximum file size: 200MB<br>
         Maximum files per upload: 2
     </p>
@@ -18,7 +18,7 @@
         <div id="dropZone"
              class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition">
             <p id="dropZoneText" class="text-gray-500">Drag & drop your audio here, or click to select a file</p>
-            <input type="file" name="audio_file" id="fileInput" accept=".mp3,.wav,.m4a,.aac" class="hidden" multiple required>
+            <input type="file" name="audio_file" id="fileInput" accept=".mp3,.wav,.m4a,.aac,.mpeg,audio/mpeg" class="hidden" multiple required>
         </div>
 
         <button type="submit"

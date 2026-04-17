@@ -1,10 +1,12 @@
 import os
 import math
 import subprocess
+import logging
 
 DEFAULT_CHUNK_LENGTH = 600  # seconds
 DEFAULT_OVERLAP = 2
 
+logger = logging.getLogger("transcription")
 
 def get_audio_duration(audio_path: str) -> float:
     """
@@ -25,6 +27,7 @@ def get_audio_duration(audio_path: str) -> float:
         )
     except subprocess.CalledProcessError as e:
         details = e.output.decode(errors="replace") if e.output else str(e)
+        logger.error
         raise RuntimeError(f"Failed to read audio duration: {details}")
 
 
@@ -53,6 +56,7 @@ def normalize_audio(audio_path: str) -> str:
         )
     except subprocess.CalledProcessError as e:
         details = e.stderr.decode(errors="replace") if e.stderr else str(e)
+        logger.error(f"FFmpeg error: {details}")
         raise RuntimeError(f"ffmpeg failed to normalize audio: {details}")
 
     return normalized_path
@@ -102,6 +106,7 @@ def chunk_audio(
             )
         except subprocess.CalledProcessError as e:
             details = e.stderr.decode(errors="replace") if e.stderr else str(e)
+            logger.error(f"FFmpeg error: {details}")
             raise RuntimeError(f"ffmpeg failed to create chunk {i}: {details}")
 
 
