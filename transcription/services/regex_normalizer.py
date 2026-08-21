@@ -1,14 +1,18 @@
 import re
+
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, Dict
 
-from .kolokwa_normalizer import KOLOKWA_PATTERNS
+from .kolokwa_normalizer import (
+    KOLOKWA_PATTERNS,
+)
 
 
 @dataclass(frozen=True)
 class NormalizationRule:
     """
-    A normalization rule with one or more regex patterns.
+    A normalization rule containing one or more
+    regular-expression patterns.
     """
     patterns: List[str]
     replacement: str
@@ -17,90 +21,184 @@ class NormalizationRule:
 
 class NormalizerEngine:
     """
-    Apply regex-based normalization rules in priority order.
-    Tracks per-rule confidence (1 if matched, 0 if not).
+    Apply normalization rules in priority order.
+
+    The engine returns:
+
+    - normalized text
+    - rule match ratio
+    - a report of rules that actually matched
     """
-    def __init__(self, rules: Iterable[NormalizationRule]):
-        self.rules = sorted(list(rules), key=lambda r: r.priority, reverse=True)
-        self._compiled: List[Tuple[NormalizationRule, List[re.Pattern]]] = [
-            (rule, [re.compile(pat, re.IGNORECASE) for pat in rule.patterns])
+
+    def __init__(
+        self,
+        rules: Iterable[NormalizationRule],
+    ):
+        self.rules = sorted(
+            list(rules),
+            key=lambda rule: rule.priority,
+            reverse=True,
+        )
+
+        self._compiled: List[
+            Tuple[
+                NormalizationRule,
+                List[re.Pattern],
+            ]
+        ] = [
+            (
+                rule,
+                [
+                    re.compile(
+                        pattern,
+                        re.IGNORECASE,
+                    )
+                    for pattern in rule.patterns
+                ],
+            )
             for rule in self.rules
         ]
 
-    def normalize(self, text: str) -> Tuple[str, float, List[Dict[str, object]]]:
+    def normalize(
+        self,
+        text: str,
+    ) -> Tuple[
+        str,
+        float,
+        List[Dict[str, object]],
+    ]:
         """
-        Normalize text and return:
-        - normalized_text
-        - overall_confidence (0.0 - 1.0)
-        - report: list of fired rules with per-rule confidence
+        Normalize text.
+
+        Returns:
+
+        normalized_text
+        rule_match_ratio
+        matched_rules
         """
-        out = text
-        report: List[Dict[str, object]] = []
+        if not text:
+            return text, 0.0, []
+
+        output = text
+
+        matched_rules: List[
+            Dict[str, object]
+        ] = []
+
+        total_rules = len(
+            self._compiled
+        )
+
+        matched_rule_count = 0
 
         for rule, patterns in self._compiled:
             matched = False
-            for pattern in patterns:
-                if pattern.search(out):
-                    matched = True
-                    out = pattern.sub(rule.replacement, out)
 
-            report.append(
-                {
-                    "replacement": rule.replacement,
-                    "patterns": rule.patterns,
-                    "priority": rule.priority,
-                    "confidence": 1 if matched else 0,
-                }
+            for pattern in patterns:
+                if pattern.search(output):
+                    matched = True
+
+                    output = pattern.sub(
+                        rule.replacement,
+                        output,
+                    )
+
+            if matched:
+                matched_rule_count += 1
+
+                matched_rules.append(
+                    {
+                        "replacement": (
+                            rule.replacement
+                        ),
+                        "patterns": rule.patterns,
+                        "priority": (
+                            rule.priority
+                        ),
+                    }
+                )
+
+        output = re.sub(
+            r"\s+",
+            " ",
+            output,
+        ).strip()
+
+        if output:
+            output = (
+                output[0].upper()
+                + output[1:]
             )
 
-        if out:
-            out = out[0].upper() + out[1:]
+        rule_match_ratio = (
+            matched_rule_count / total_rules
+            if total_rules
+            else 0.0
+        )
 
-        if report:
-            overall_confidence = sum(r["confidence"] for r in report) / len(report)
-        else:
-            overall_confidence = 0.0
-
-        return out, overall_confidence, report
+        return (
+            output,
+            rule_match_ratio,
+            matched_rules,
+        )
 
 
 def build_rules_from_kolokwa_patterns(
-    patterns: List[Tuple[str, str]],
+    patterns: List[
+        Tuple[str, str]
+    ],
 ) -> List[NormalizationRule]:
     """
-    Convert KOLOKWA_PATTERNS into NormalizationRule objects.
-    Earlier patterns get higher priority.
+    Convert Kolokwa pattern tuples into prioritized
+    normalization rules.
+
+    Earlier rules have higher priority.
     """
     total = len(patterns)
-    rules: List[NormalizationRule] = []
-    for idx, (pattern, replacement) in enumerate(patterns):
-        priority = total - idx
+
+    rules: List[
+        NormalizationRule
+    ] = []
+
+    for index, (
+        pattern,
+        replacement,
+    ) in enumerate(patterns):
+
+        priority = (
+            total - index
+        )
+
         rules.append(
             NormalizationRule(
-                patterns=[pattern],
+                patterns=[
+                    pattern
+                ],
                 replacement=replacement,
                 priority=priority,
             )
         )
+
     return rules
 
 
-DEFAULT_ENGINE = NormalizerEngine(build_rules_from_kolokwa_patterns(KOLOKWA_PATTERNS))
+DEFAULT_ENGINE = NormalizerEngine(
+    build_rules_from_kolokwa_patterns(
+        KOLOKWA_PATTERNS
+    )
+)
 
 
-def normalize_text(text: str) -> str:
+def normalize_text(
+    text: str,
+) -> str:
     """
-    Normalize text using the default engine and return normalized text only.
+    Normalize text and return only the normalized result.
     """
-    normalized, _confidence, _report = DEFAULT_ENGINE.normalize(text)
+    normalized, _, _ = (
+        DEFAULT_ENGINE.normalize(
+            text
+        )
+    )
+
     return normalized
-
-
-# Example usage
-if __name__ == "__main__":
-    engine = NormalizerEngine(build_rules_from_kolokwa_patterns(KOLOKWA_PATTERNS))
-    sample = "I na know wetin da one mean."
-    normalized_text, overall_conf, fired_rules = engine.normalize(sample)
-    print("Normalized:", normalized_text)
-    print("Overall confidence:", overall_conf)
-    print("Fired rules:", [r for r in fired_rules if r["confidence"] == 1])

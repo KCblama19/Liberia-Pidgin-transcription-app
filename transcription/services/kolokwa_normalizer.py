@@ -1,64 +1,112 @@
 import re
 
-# Expanded map for common Liberian English / Kolokwa expressions
-# Order matters: longer/more specific phrases should come first.
+# Conservative phrase-based normalization.
+#
+# Important:
+# We avoid aggressive single-word substitutions because
+# words such as "na", "da", and "dey" can depend heavily
+# on context.
+#
+# Longer and more specific phrases should appear first.
 KOLOKWA_PATTERNS = [
-    (r"\bI na know\b", "I do not know"),
-    (r"\bI now know\b", "I don't know"),
-    (r"\bI na there\b", "I am not there"),
-    (r"\bAnna\b", "I don't"),
-    (r"\bla me\b", "It is I"),
-    (r"\bmy pa\b", "my father"),
-    (r"\bsmall-small\b", "gradually"),
-    (r"\bda one\b", "that one"),
-    (r"\bla one\b", "that one"),
-    (r"\bhow you doing\b", "how are you"),
-    (r"\bI alright\b", "I am okay"),
-    (r"\bwe try\b", "we tried"),
-    (r"\bplenty\b", "many"),
-    (r"\bhard\b", "difficult"),
-    (r"\bshe-self\b", "herself"),
-    (r"\bhim-self\b", "himself"),
-    (r"\bman-self\b", "himself"),
-    (r"\bgirl-self\b", "herself"),
-    (r"\bwetin\b", "what"),
-    (r"\bwen\b", "when"),
-    (r"\bwat\b", "what"),
-    (r"\bwi\b", "we"),
-    (r"\bdey\b", "is"),
-    (r"\bking\b", "came"),
-    (r"\bHappo\b", "Harper"),
-    (r"\bPinget\b", "bring it"),
-    (r"\bNassau\b", "that side"),
-    (r"\bfishers\b", "freezers"),
-    # Short tokens last to reduce over-matching
-    (r"\bda\b", "that"),
-    (r"\bla\b", "that"),
-    (r"\bdis\b", "this"),
-    (r"\blay\b", "this"),
-    (r"\bdat\b", "that"),
-    (r"\bmeh\b", "me"),
-    (r"\bko\b", "call"),
-    (r"\bpo\b", "people"),
-    (r"\bna\b", "not"),
+    (
+        r"\bI\s+na\s+know\b",
+        "I do not know",
+    ),
+    (
+        r"\bI\s+now\s+know\b",
+        "I do not know",
+    ),
+    (
+        r"\bI\s+na\s+there\b",
+        "I am not there",
+    ),
+    (
+        r"\bI\s+alright\b",
+        "I am alright",
+    ),
+    (
+        r"\bhow\s+you\s+doing\b",
+        "how are you doing",
+    ),
+    (
+        r"\bsmall[\s-]+small\b",
+        "gradually",
+    ),
+    (
+        r"\bmy\s+pa\b",
+        "my father",
+    ),
+    (
+        r"\bshe[\s-]+self\b",
+        "herself",
+    ),
+    (
+        r"\bhim[\s-]+self\b",
+        "himself",
+    ),
+    (
+        r"\bman[\s-]+self\b",
+        "himself",
+    ),
+    (
+        r"\bgirl[\s-]+self\b",
+        "herself",
+    ),
+
+    # Known transcription corrections.
+    (
+        r"\bHappo\b",
+        "Harper",
+    ),
 ]
 
-# Precompile regex patterns for performance
-COMPILED_PATTERNS = [(re.compile(pat, re.IGNORECASE), repl) for pat, repl in KOLOKWA_PATTERNS]
+
+COMPILED_PATTERNS = [
+    (
+        re.compile(
+            pattern,
+            re.IGNORECASE,
+        ),
+        replacement,
+    )
+    for pattern, replacement in KOLOKWA_PATTERNS
+]
 
 
 def normalize(text: str) -> str:
     """
-    Converts Liberian English / Kolokwa phrases into standard English.
+    Apply conservative Liberian English / Kolokwa
+    normalization.
+
+    The original transcript is not modified elsewhere.
+    This function only produces the normalized English
+    version.
     """
-    out = text
+    if not text:
+        return text
 
-    # Apply all pattern replacements
+    output = text
+
     for pattern, replacement in COMPILED_PATTERNS:
-        out = pattern.sub(replacement, out)
+        output = pattern.sub(
+            replacement,
+            output,
+        )
 
-    # Capitalize first letter of the sentence
-    if out:
-        out = out[0].upper() + out[1:]
+    # Clean accidental repeated whitespace.
+    output = re.sub(
+        r"\s+",
+        " ",
+        output,
+    ).strip()
 
-    return out
+    # Capitalize the first character while preserving
+    # the rest of the transcription.
+    if output:
+        output = (
+            output[0].upper()
+            + output[1:]
+        )
+
+    return output

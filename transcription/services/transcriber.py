@@ -6,8 +6,6 @@ from django.conf import settings
 
 _DEVICE = "cpu"
 _COMPUTE_TYPE = "int8"
-_CPU_THREADS = 3
-_NUM_WORKERS = 1
 
 _PROFILES = {
     # Best for running multiple Celery workers in parallel
@@ -17,7 +15,11 @@ _PROFILES = {
 }
 
 
-def _get_profile_settings():
+def _get_profile_settings() -> dict:
+    """
+    Load the transcription profile from Django settings
+    or the environment
+    """
     profile = getattr(settings, "TRANSCRIBE_PROFILE", None) or os.environ.get("TRANSCRIBE_PROFILE", "multi_job")
     profile = profile.strip().lower()
     return _PROFILES.get(profile, _PROFILES["multi_job"])
@@ -25,12 +27,21 @@ def _get_profile_settings():
 _model = None
 _model_lock = Lock()
 
-def get_model():
+def get_model() -> WhisperModel:
+    """
+    Lazily load Faster-Whisper once per process.
+    
+    The lock only protexts model initialization
+    Transcription itself is intentionally performed
+    sequentially within a task
+    """
     global _model
+    
     if _model is None:
         with _model_lock:
             if _model is None:
                 profile_settings = _get_profile_settings()
+               
                 _model = WhisperModel(
                     "systran/faster-whisper-medium",
                     device=_DEVICE,
@@ -41,23 +52,34 @@ def get_model():
                 )
     return _model
 
-def transcribe_chunk(audio_path: str, fast_mode: bool = False):
+def transcribe_chunk(audio_path: str, fast_mode: bool = False) -> list[dict]:
+    """
+    Transcribe one normalized audio chunk.
+    
+    Returned timestamps are relative to the beginning
+    of this chunk. The pipeline is responsible for 
+    applying the chunk's absolute start offset
+    """
+    
     if not os.path.exists(audio_path):
-        raise FileNotFoundError(audio_path)
+        raise FileNotFoundError(
+            f"Audio file does not exist: {audio_path}"
+        )
 
     model = get_model()
     beam_size = 1 if fast_mode else 5
 
-    segments, _ = model.transcribe(
+    segments, _info = model.transcribe(
         audio_path,
         beam_size=beam_size,
         temperature=0.0,
         vad_filter=False,
         condition_on_previous_text=False,
-        language="en", #force English
+        language="en",
     )
 
-    results = []
+    results: list[dict] = []
+    
     for seg in segments:
         text = seg.text.strip()
         if len(text) < 2:
@@ -67,7 +89,7 @@ def transcribe_chunk(audio_path: str, fast_mode: bool = False):
             "start": seg.start,
             "end": seg.end,
             "original": text,
-            "english": "",  # will be filled by build_segments
+            "english": "",  # It will later contain the normalized text
             "speaker": detect_speaker(text),
             "type": "Question" if is_question(text) else "Answer",
         })
