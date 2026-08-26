@@ -9,9 +9,9 @@ _COMPUTE_TYPE = "int8"
 
 _PROFILES = {
     # Best for running multiple Celery workers in parallel
-    "multi_job": {"cpu_threads": 3, "num_workers": 1},
+    "multi_job": {"cpu_threads": 4, "num_workers": 1},
     # Best for running a single worker and one transcription at a time
-    "single_job": {"cpu_threads": 6, "num_workers": 2},
+    "single_job": {"cpu_threads": 6, "num_workers": 1},
 }
 
 
@@ -20,9 +20,9 @@ def _get_profile_settings() -> dict:
     Load the transcription profile from Django settings
     or the environment
     """
-    profile = getattr(settings, "TRANSCRIBE_PROFILE", None) or os.environ.get("TRANSCRIBE_PROFILE", "multi_job")
+    profile = getattr(settings, "TRANSCRIBE_PROFILE", None) or os.environ.get("TRANSCRIBE_PROFILE", "single_jon")
     profile = profile.strip().lower()
-    return _PROFILES.get(profile, _PROFILES["multi_job"])
+    return _PROFILES.get(profile, _PROFILES["single_job"])
 
 _model = None
 _model_lock = Lock()
@@ -32,8 +32,8 @@ def get_model() -> WhisperModel:
     Lazily load Faster-Whisper once per process.
     
     The lock only protexts model initialization
-    Transcription itself is intentionally performed
-    sequentially within a task
+    Chunk-level transcription concurrency is controlled
+    by the ThreadPoolExecutor in the transcription pipeline.
     """
     global _model
     
