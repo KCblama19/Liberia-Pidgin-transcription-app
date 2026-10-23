@@ -7,8 +7,6 @@ Note: Transcription to Liberian Pidgin is not perfect and may contain mistakes. 
 
 The translation pipeline is intentionally designed to allow optional LLM-based semantic normalization in the future. This feature is currently disabled to avoid external dependencies and costs.
 
-This project started as an exploratory, fast-iteration build driven by experimentation and intuition.
-
 
 ## Requirements
 - Python 3.11+
