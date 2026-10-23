@@ -87,6 +87,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "insecure-dev-key")
 DEBUG = True
 ALLOWED_HOSTS = []
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # ======================
@@ -150,9 +151,14 @@ WSGI_APPLICATION = 'transcriber_project.wsgi.application'
 # ======================
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ["POSTGRESQL_DB_NAME"],
+        "USER": os.environ["POSTGRESQL_DB_USER"],
+        "PASSWORD": os.environ["POSTGRESQL_PASSWORD"],
+        "HOST": os.environ.get("POSTGRESQL_HOST", "localhost"),
+        "PORT": os.environ.get("POSTGRESQL_PORT", "5432"),
+        "CONN_MAX_AGE": 60,
     }
 }
 

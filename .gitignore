@@ -18,6 +18,13 @@ db.sqlite3
 media/
 staticfiles/
 *.log
+db.sqlite3.backup_20261022_131228
+db.sqlite3.corrupt-backup
+inspect_transcripts.py
+recovered.sqlite
+recovered.sql
+compare_recovered.py
+transcriber_postgres_backup_20261022_141909.dump
 
 # Celery / cache
 celerybeat-schedule
@@ -36,3 +43,6 @@ Thumbs.db
 
 # Local env
 .env
+
+# Local Files
+
